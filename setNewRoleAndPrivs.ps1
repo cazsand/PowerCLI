@@ -1,14 +1,16 @@
 $cvRole = "VM Tower Users"
-$cvRolesFile = "c:\vm_toweruser_role_ids.txt"
+$cvRoleFileID="C:\Scripts\Entradas\vmTorreUser_Privileges_ids.txt"
 $viServer = Read-Host -Prompt 'Entra el nombre del servidor'
 Connect-VIServer -server $viServer
-$cvRoleIds = @()
 
-     Get-Content $cvRolesFile | Foreach-Object{
-        $cvRoleIds += $_P
+#### Creacion de arreglo vacio
+$roleIds = @()
+
+     Get-Content $cvRoleFileID | Foreach-Object{
+        $roleIds += $_
      }
-     
-   New-VIRole -name $cvRole -Privilege (Get-VIPrivilege -Server $viserver -id $cvRoleIds) -Server $viserver
-   Set-VIRole -Role $cvRole -AddPrivilege (Get-VIPrivilege -Server $viserver -id $cvRoleIds) -Server $viserver
+
+   New-VIRole -name $cvRole -Privilege (Get-VIPrivilege -Server $viServer -id $roleIds) -Server $viServer
+   Set-VIRole -Role $cvRole -AddPrivilege (Get-VIPrivilege -Server $viServer -id $roleIds) -Server $viServer
    
    
