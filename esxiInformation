@@ -1,0 +1,22 @@
+$viServer = Read-Host -Prompt 'Entra el nombre del vCenter donde requieres informacion:   '
+Connect-VIServer -server $viServer
+
+Get-VMHost | Select name,
+    @{N="Host";E={($_ | Get-VMHostNetwork).Hostname}},
+    @{N="Version";E={"$($_.ExtensionData.Config.Product.Name) $($_.Version) build $($_.Build)"}},
+  #  @{N="Datacenter";E={($_ | Get-Datacenter).Name}},
+    @{N="Cluster";E={($_ | get-cluster).Name}},
+    @{N="Cpu Model";E={($_| Get-View).Hardware.CpuPkg[0].Description}},
+    @{N="Speed";E={"" + [math]::round(($_| get-view).Hardware.CpuInfo.Hz / 1000000, 0)}},
+    @{N="HT Available";E={($_).HyperthreadingActive}},
+    @{N="HT Active";E={($_ | get-view).Config.HyperThread.Active}},
+    @{N="Uptime"; E={(Get-Date) - $_.Summary.Runtime.BootTime}},
+    @{N="# CPU";E={($_| Get-View).Hardware.CpuInfo.NumCpuPackages}},
+    @{N="Cores per CPU";E={($_| Get-View).Hardware.CpuInfo.NumCpuCores /($_| Get-View).Hardware.CpuInfo.NumCpuPackages}},
+    @{N="#Cores";E={($_| Get-View).Hardware.CpuInfo.NumCpuCores}},
+    @{N="Vendor";E={($_| Get-View).Summary.Hardware.Vendor}},
+    @{N="Model";E={($_| Get-View).Hardware.SystemInfo.Vendor+" "+ ($_| Get-View).Hardware.SystemInfo.Model}},
+    @{N="Memory GB";E={"" + [math]::round(($_| get-view).Hardware.MemorySize / 1GB, 0) + " GB"}},
+    @{N="InstallDate";E={(Get-Date "1970-1-1").AddSeconds([int]"0x$((Get-EsxCli -VMHost $_).system.uuid.get().Split('-')[0])")}} |
+
+Export-Csv -Path "C:\Scripts\Salidas\$((Get-Date).ToString("yyyyMMdd_HHmmss"))_Inventario_$viServer.csv" -NoTypeInformation
