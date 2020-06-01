@@ -1,8 +1,8 @@
 ### Version 1.5
   $vcHosts = @(
-        "srvvcenpvlmx01",
-        "srvvcenpvlmx02",
-        "srvvcenpvlmx03"
+        "vcenter01",
+        "vcenter02",
+        "vcenter03"
         );
 
 ForEach ($vc in $vcHosts) {
