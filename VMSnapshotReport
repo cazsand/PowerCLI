@@ -1,14 +1,25 @@
-### Version 1.0
+### Version 1.5
+  $vcHosts = @(
+        "srvvcenpvlmx01",
+        "srvvcenpvlmx02",
+        "srvvcenpvlmx03"
+        );
 
-$viServer = Read-Host -Prompt 'Entra el nombre del servidor'
-Connect-VIServer -server $viServer #Need to automate this
+ForEach ($vc in $vcHosts) {
+
+    Get-VICredentialStoreItem -Host $vc
+    Connect-VIServer $vc 
+
+
+
+
 
 # Obtain a list of VMs in the Cluster and sort them by name
 
-   [Array]$vmList = @( Get-VM | Sort Name );
+        [Array]$vmList = @( Get-VM | Sort Name );
 
-$results = foreach ( $vmItem in $vmList )
-{
+      $results = foreach ( $vmItem in $vmList )
+           {
    # Get the Snapshot information of every VM in #vmList
 
    [Array] $vmSnapshotList = @( Get-Snapshot -VM $vmItem )     
@@ -16,7 +27,7 @@ $results = foreach ( $vmItem in $vmList )
    # Now we need to select what to see
 
   foreach ( $snapshotItem in $vmSnapshotList )
-    {
+          {
      # I need everything rounded up in GB so it makes sense
 
         $vmProvisionedSpaceGB = [Math]::Round( $vmItem.ProvisionedSpaceGB, 2 );
@@ -45,5 +56,6 @@ $results = foreach ( $vmItem in $vmList )
     } 
 }   
 
-$results | Export-Csv -Path "C:\Scripts\Salidas\$((Get-Date).ToString("yyyyMMdd_HHmmss"))_Snaphot_$viServer.csv" -NoTypeInformation 
+$results | Export-Csv -Path "C:\Scripts\Salidas\$((Get-Date).ToString("yyyyMMdd_HHmmss"))_Snaphot_$vc.csv" -NoTypeInformation 
 
+}
