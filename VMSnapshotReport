@@ -1,17 +1,22 @@
-### Version 1.5
-  $vcHosts = @(
-        "srvvcenpvlmx01",
-        "srvvcenpvlmx02",
-        "srvvcenpvlmx03"
-        );
+#################################
+#
+#		Inventario de Snapshots
+#		Cesar Sandoval
+#		csandoval@produban.com.mx
+#		06/03/2020   V 1.5
+#
+#################################
 
-ForEach ($vc in $vcHosts) {
+
+$vcList = Get-Content "D:\Scripts\Reports\Input\vCenter List T.txt"
+
+ForEach ($vc in $vcList) {
 
     Get-VICredentialStoreItem -Host $vc
     Connect-VIServer $vc 
 
 
-
+    
 
 
 # Obtain a list of VMs in the Cluster and sort them by name
@@ -22,7 +27,7 @@ ForEach ($vc in $vcHosts) {
            {
    # Get the Snapshot information of every VM in #vmList
 
-   [Array] $vmSnapshotList = @( Get-Snapshot -VM $vmItem )     
+       [Array] $vmSnapshotList = @( Get-Snapshot -VM $vmItem )     
 
    # Now we need to select what to see
 
@@ -35,9 +40,10 @@ ForEach ($vc in $vcHosts) {
         $snapshotSizeGB       = [Math]::Round( $snapshotItem.SizeGB,       2 );
         $snapshotAgeDays      = ((Get-Date) - $snapshotItem.Created).Days;
         $snapevent = Get-VIEvent -Entity $snapshotItem.VM -Types Info -Finish $snapshotItem.Created -MaxSamples 1 | Where-Object {$_.FullFormattedMessage -imatch "Task: Create virtual machine snapshot"};
-
+        $snapLocation =  $global:defaultviserver;
         $output = New-Object -TypeName PSObject;
 
+        $output | Add-Member -MemberType NoteProperty -Name "vCenter" -Value $snapLocation;
         $output | Add-Member -MemberType NoteProperty -Name "VM"                 -Value $vmItem;
         $output | Add-Member -MemberType NoteProperty -Name "Name"               -Value $snapshotItem.Name;
         $output | Add-Member -MemberType NoteProperty -Name "Description"        -Value $snapshotItem.Description;
@@ -49,13 +55,14 @@ ForEach ($vc in $vcHosts) {
         $output | Add-Member -MemberType NoteProperty -Name "Snapshot Size in GB"     -Value $snapshotSizeGB;
         $output | Add-Member -MemberType NoteProperty -Name "Provisioned Space in GB" -Value $vmProvisionedSpaceGB;
         $output | Add-Member -MemberType NoteProperty -Name "Used Space in GB"        -Value $vmUsedSpaceGB;
-       # $output | Add-Member -MemberType NoteProperty -Name "Snapshot Location" -Value $snapshotItem.ExtensionData.Snapshot;
+       
         
 
-        $output;
+        $output; 
+        
     } 
 }   
 
-$results | Export-Csv -Path "C:\Scripts\Salidas\$((Get-Date).ToString("yyyyMMdd_HHmmss"))_Snaphot_$vc.csv" -NoTypeInformation 
+$results | Export-Csv -Path "D:\Scripts\Reports\Exits\Snapshots\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv" -NoTypeInformation -Append
 
 }
