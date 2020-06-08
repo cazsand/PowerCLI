@@ -3,12 +3,12 @@
 #		Inventario de Snapshots
 #		Cesar Sandoval
 #		csandoval@produban.com.mx
-#		06/03/2020   V 1.5
+#		06/03/2020   V 1.7
 #
 #################################
 
 
-$vcList = Get-Content "D:\Scripts\Reports\Input\vCenter List T.txt"
+$vcList = Get-Content "D:\Scripts\Reports\Input\vCenter List.txt"
 
 ForEach ($vc in $vcList) {
 
@@ -35,6 +35,7 @@ ForEach ($vc in $vcList) {
           {
      # I need everything rounded up in GB so it makes sense
 
+        $vmGuestOS    =  Get-VMGuest -VM $vmitem
         $vmProvisionedSpaceGB = [Math]::Round( $vmItem.ProvisionedSpaceGB, 2 );
         $vmUsedSpaceGB        = [Math]::Round( $vmItem.UsedSpaceGB,        2 );
         $snapshotSizeGB       = [Math]::Round( $snapshotItem.SizeGB,       2 );
@@ -45,6 +46,8 @@ ForEach ($vc in $vcList) {
 
         $output | Add-Member -MemberType NoteProperty -Name "vCenter" -Value $snapLocation;
         $output | Add-Member -MemberType NoteProperty -Name "VM"                 -Value $vmItem;
+        $output | Add-Member -MemberType NoteProperty -Name "Guest OS"                 -Value $vmGuestOS.ConfiguredGuestId;
+        $output | Add-Member -MemberType NoteProperty -Name "Guest Family"                 -Value $vmGuestOS.OSFullName;
         $output | Add-Member -MemberType NoteProperty -Name "Name"               -Value $snapshotItem.Name;
         $output | Add-Member -MemberType NoteProperty -Name "Description"        -Value $snapshotItem.Description;
         $output | Add-Member -MemberType NoteProperty -Name "Created"            -Value $snapshotItem.Created;
@@ -61,8 +64,21 @@ ForEach ($vc in $vcList) {
         $output; 
         
     } 
-}   
 
-$results | Export-Csv -Path "D:\Scripts\Reports\Exits\Snapshots\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv" -NoTypeInformation -Append
+   
 
-}
+} $results  
+
+    $path = "D:\PATH\$(Get-Date -format yyyy)\$(Get-Date -format MMM)"
+    md $path -Force
+    $file = "$path\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv"
+    $results | Export-Csv $file -NoTypeInformation -append;
+
+
+#$results = Export-Csv -Path "D:\PATH\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv" -NoTypeInformation -Append
+
+
+
+}  
+
+
