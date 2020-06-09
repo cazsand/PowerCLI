@@ -1,0 +1,25 @@
+#################################
+#
+#		Inventario de VMDKS y su ubicación 
+#		Cesar Sandoval
+#		caz.sandoval@gmail.com
+#		06/03/2020   V 1.0
+#
+#################################
+
+
+
+ForEach ($Datacenter in (Get-Datacenter | Sort-Object -Property Name)) {
+  ForEach ($Cluster in ($Datacenter | Get-Cluster | Sort-Object -Property Name)) { 
+   ForEach ($VM in ($Cluster | Get-VM | Sort-Object -Property Name)) {
+      ForEach ($HardDisk in ($VM | Get-HardDisk | Sort-Object -Property Name)) {
+        "" | Select-Object -Property @{N="VM";E={$VM.Name}},
+          @{N="Datacenter";E={$Datacenter.name}},
+          @{N="Cluster";E={$Cluster.Name}},
+          @{N="Hard Disk";E={$HardDisk.Name}},
+          @{N="Datastore";E={$HardDisk.FileName.Split("]")[0].TrimStart("[")}},
+          @{N="VMDKpath";E={$HardDisk.FileName}}
+      }   $results | Export-Csv -Path "C:\Scripts\$((Get-Date).ToString("yyyyMMdd"))_vmdk.csv" -NoTypeInformation -append
+    }   
+  }    
+    
