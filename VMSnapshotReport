@@ -2,46 +2,50 @@
 #
 #		Inventario de Snapshots
 #		Cesar Sandoval
-#		csandoval@produban.com.mx
-#		06/03/2020   V 1.7
+#		caz.sandoval@gmail.com
+#		06/03/2020   V 2.0
 #
 #################################
 
+clear
+$start = date
 
-$vcList = Get-Content "D:\Scripts\Reports\Input\vCenter List.txt"
-
-ForEach ($vc in $vcList) {
-
-    Get-VICredentialStoreItem -Host $vc
-    Connect-VIServer $vc 
-
-
-    
+[Array]$vcList = @(Import-Csv -Path "D:\Scripts\Reports\Input\vCenter List.csv")
+$path = "D:\Scripts\Reports\Exits\Snapshots\$(Get-Date -format yyyy)\$(Get-Date -format MMM)"
+md $path -Force
+$file = "$path\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv"
+$results = @()
 
 
-# Obtain a list of VMs in the Cluster and sort them by name
 
-        [Array]$vmList = @( Get-VM | Sort Name );
+ forEach ($vc in $vcList) {
 
-      $results = foreach ( $vmItem in $vmList )
+    Get-VICredentialStoreItem -Host $vc.vcName
+    Connect-VIServer $vc.vcName -ErrorAction SilentlyContinue
+        
+                         
+
+       [Array]$vmList = @( Get-VM );
+     
+       foreach ( $vmItem in $vmList )
            {
-   # Get the Snapshot information of every VM in #vmList
+  
 
        [Array] $vmSnapshotList = @( Get-Snapshot -VM $vmItem )     
 
-   # Now we need to select what to see
+  
 
-  foreach ( $snapshotItem in $vmSnapshotList )
+     foreach ( $snapshotItem in $vmSnapshotList )
           {
-     # I need everything rounded up in GB so it makes sense
-
+     
         $vmGuestOS    =  Get-VMGuest -VM $vmitem
+        $snapLocation =  (Get-VM $vmitem).Uid.Split(":")[0].Split("@")[1] 
         $vmProvisionedSpaceGB = [Math]::Round( $vmItem.ProvisionedSpaceGB, 2 );
         $vmUsedSpaceGB        = [Math]::Round( $vmItem.UsedSpaceGB,        2 );
         $snapshotSizeGB       = [Math]::Round( $snapshotItem.SizeGB,       2 );
         $snapshotAgeDays      = ((Get-Date) - $snapshotItem.Created).Days;
         $snapevent = Get-VIEvent -Entity $snapshotItem.VM -Types Info -Finish $snapshotItem.Created -MaxSamples 1 | Where-Object {$_.FullFormattedMessage -imatch "Task: Create virtual machine snapshot"};
-        $snapLocation =  $global:defaultviserver;
+       
         $output = New-Object -TypeName PSObject;
 
         $output | Add-Member -MemberType NoteProperty -Name "vCenter" -Value $snapLocation;
@@ -59,26 +63,23 @@ ForEach ($vc in $vcList) {
         $output | Add-Member -MemberType NoteProperty -Name "Provisioned Space in GB" -Value $vmProvisionedSpaceGB;
         $output | Add-Member -MemberType NoteProperty -Name "Used Space in GB"        -Value $vmUsedSpaceGB;
        
+        $results += $output
+       
         
 
-        $output; 
+       
         
-    } 
-
-   
-
-} $results  
-
-    $path = "D:\PATH\$(Get-Date -format yyyy)\$(Get-Date -format MMM)"
-    md $path -Force
-    $file = "$path\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv"
-    $results | Export-Csv $file -NoTypeInformation -append;
-
-
-#$results = Export-Csv -Path "D:\PATH\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv" -NoTypeInformation -Append
-
-
-
-}  
-
+             } 
+             
+             
+                   
+            } 
+                 
+      }      
+             
+          
+$results | Group-Object "VM" | foreach-object { $_.group | sort-object currentstatusdate | select -last 1} | Export-Csv $file -NoTypeInformation   
+#   $results | Sort-Object * -Unique | Export-Csv $file -NoTypeInformation 
+$end = date
+Write-Host ("start time "+$start + " End time: " + $end)
 
