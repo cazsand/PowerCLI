@@ -3,7 +3,7 @@
 #		Inventario de Snapshots
 #		Cesar Sandoval
 #		caz.sandoval@gmail.com
-#		06/03/2020   V 2.0
+#		06/17/2020   V 2.5
 #
 #################################
 
@@ -16,13 +16,11 @@ md $path -Force
 $file = "$path\$((Get-Date).ToString("yyyyMMdd"))_Snaphot.csv"
 $results = @()
 
-
-
  forEach ($vc in $vcList) {
 
     Get-VICredentialStoreItem -Host $vc.vcName
     Connect-VIServer $vc.vcName -ErrorAction SilentlyContinue
-        
+    $list=get-view -viewtype VirtualMachine 
                          
 
        [Array]$vmList = @( Get-VM );
@@ -35,35 +33,35 @@ $results = @()
 
   
 
-     foreach ( $snapshotItem in $vmSnapshotList )
+            foreach ( $snapshotItem in $vmSnapshotList )
           {
      
-        $vmGuestOS    =  Get-VMGuest -VM $vmitem
-        $snapLocation =  (Get-VM $vmitem).Uid.Split(":")[0].Split("@")[1] 
-        $vmProvisionedSpaceGB = [Math]::Round( $vmItem.ProvisionedSpaceGB, 2 );
-        $vmUsedSpaceGB        = [Math]::Round( $vmItem.UsedSpaceGB,        2 );
-        $snapshotSizeGB       = [Math]::Round( $snapshotItem.SizeGB,       2 );
-        $snapshotAgeDays      = ((Get-Date) - $snapshotItem.Created).Days;
-        $snapevent = Get-VIEvent -Entity $snapshotItem.VM -Types Info -Finish $snapshotItem.Created -MaxSamples 1 | Where-Object {$_.FullFormattedMessage -imatch "Task: Create virtual machine snapshot"};
+                $vmGuestOS    =  Get-VMGuest -VM $vmitem
+                $snapLocation =  (Get-VM $vmitem).Uid.Split(":")[0].Split("@")[1] 
+                $vmProvisionedSpaceGB = [Math]::Round( $vmItem.ProvisionedSpaceGB, 2 );
+                $vmUsedSpaceGB        = [Math]::Round( $vmItem.UsedSpaceGB,        2 );
+                $snapshotSizeGB       = [Math]::Round( $snapshotItem.SizeGB,       2 );
+                $snapshotAgeDays      = ((Get-Date) - $snapshotItem.Created).Days;
+                $snapevent = Get-VIEvent -Entity $snapshotItem.VM -Types Info -Finish $snapshotItem.Created -MaxSamples 1 | Where-Object {$_.FullFormattedMessage -imatch "Task: Create virtual machine snapshot"};
        
-        $output = New-Object -TypeName PSObject;
+                $output = New-Object -TypeName PSObject;
 
-        $output | Add-Member -MemberType NoteProperty -Name "vCenter" -Value $snapLocation;
-        $output | Add-Member -MemberType NoteProperty -Name "VM"                 -Value $vmItem;
-        $output | Add-Member -MemberType NoteProperty -Name "Guest OS"                 -Value $vmGuestOS.ConfiguredGuestId;
-        $output | Add-Member -MemberType NoteProperty -Name "Guest Family"                 -Value $vmGuestOS.OSFullName;
-        $output | Add-Member -MemberType NoteProperty -Name "Name"               -Value $snapshotItem.Name;
-        $output | Add-Member -MemberType NoteProperty -Name "Description"        -Value $snapshotItem.Description;
-        $output | Add-Member -MemberType NoteProperty -Name "Created"            -Value $snapshotItem.Created;
-        $output | Add-Member -MemberType NoteProperty -Name "Created by" -Value $snapevent.UserName;
-        $output | Add-Member -MemberType NoteProperty -Name "Number of Days Active"            -Value $snapshotAgeDays;
-        $output | Add-Member -MemberType NoteProperty -Name "Parent Snapshot"     -Value $snapshotItem.ParentSnapshot.Name;
-        $output | Add-Member -MemberType NoteProperty -Name "Is this the Current Snapshot?"  -Value $snapshotItem.IsCurrent;
-        $output | Add-Member -MemberType NoteProperty -Name "Snapshot Size in GB"     -Value $snapshotSizeGB;
-        $output | Add-Member -MemberType NoteProperty -Name "Provisioned Space in GB" -Value $vmProvisionedSpaceGB;
-        $output | Add-Member -MemberType NoteProperty -Name "Used Space in GB"        -Value $vmUsedSpaceGB;
+               $output | Add-Member -MemberType NoteProperty -Name "vCenter" -Value $snapLocation;
+               $output | Add-Member -MemberType NoteProperty -Name "VM"                 -Value $vmItem;
+               $output | Add-Member -MemberType NoteProperty -Name "Guest OS"                 -Value $vmGuestOS.ConfiguredGuestId;
+               $output | Add-Member -MemberType NoteProperty -Name "Guest Family"                 -Value $vmGuestOS.OSFullName;
+               $output | Add-Member -MemberType NoteProperty -Name "Name"               -Value $snapshotItem.Name;
+               $output | Add-Member -MemberType NoteProperty -Name "Description"        -Value $snapshotItem.Description;
+               $output | Add-Member -MemberType NoteProperty -Name "Created"            -Value $snapshotItem.Created;
+               $output | Add-Member -MemberType NoteProperty -Name "Created by" -Value $snapevent.UserName;
+               $output | Add-Member -MemberType NoteProperty -Name "Number of Days Active"            -Value $snapshotAgeDays;
+               $output | Add-Member -MemberType NoteProperty -Name "Parent Snapshot"     -Value $snapshotItem.ParentSnapshot.Name;
+               $output | Add-Member -MemberType NoteProperty -Name "Is this the Current Snapshot?"  -Value $snapshotItem.IsCurrent;
+               $output | Add-Member -MemberType NoteProperty -Name "Snapshot Size in GB"     -Value $snapshotSizeGB;
+               $output | Add-Member -MemberType NoteProperty -Name "Provisioned Space in GB" -Value $vmProvisionedSpaceGB;
+               $output | Add-Member -MemberType NoteProperty -Name "Used Space in GB"        -Value $vmUsedSpaceGB;
        
-        $results += $output
+             $results += $output
        
         
 
@@ -71,15 +69,14 @@ $results = @()
         
              } 
              
-             
+              
                    
-            } 
-                 
+            }    $list = @()
+                 Disconnect-VIServer $vc.vcName -Force -confirm:$false
       }      
              
           
-$results | Group-Object "VM" | foreach-object { $_.group | sort-object currentstatusdate | select -last 1} | Export-Csv $file -NoTypeInformation   
-#   $results | Sort-Object * -Unique | Export-Csv $file -NoTypeInformation 
+$results | Export-Csv $file -NoTypeInformation   
 $end = date
 Write-Host ("start time "+$start + " End time: " + $end)
 
