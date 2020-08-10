@@ -1,0 +1,77 @@
+#################################
+#
+#		Inventario de VMs apagadas
+#		Cesar Sandoval
+#		caz.sandoval@gmail.com
+#		08/10/2020   V 1.0
+#
+#################################
+clear
+$start = date
+
+[Array]$vcList = @(Import-Csv -Path "D:\Scripts\Reports\Input\vCenter List.csv")
+$path = "D:\Scripts\Reports\Exits\Powered Off VMs\$(Get-Date -format yyyy)\$(Get-Date -format MMM)"
+md $path -Force
+$file = "$path\$((Get-Date).ToString("yyyyMMdd"))_OffVMs.csv"
+$results = @()
+
+
+forEach ($vc in $vcList) {
+
+   
+    Connect-VIServer $vc.vcName -ErrorAction SilentlyContinue
+    $list=get-view -viewtype VirtualMachine
+                         
+
+    [Array]$vmList = @( Get-VM );
+     
+    foreach ( $vmItem in $vmList )
+
+           {
+
+            $offVMs = get-vm | where-object {$vmItem.powerstate -eq "poweredoff"}
+            $DataLocation = Get-Datastore #| select Name, Id
+            $offDate = Get-VIEvent -Entity $offVMs -MaxSamples ([int]::MaxValue) | where {$_ -is [VMware.Vim.VmPoweredOffEvent]}  
+            
+      #$row = '' | select VMName,Powerstate,OS,Host,Cluster,Datastore,NumCPU,MemMb,DiskGb,PowerOFF
+            $vCenter = (Get-VM $vmitem).Uid.Split(":")[0].Split("@")[1] 
+      
+      #$row.Powerstate = $vm.Powerstate
+      #$row.OS = $vm.Guest.OSFullName 
+      #$row.Host = $vm.VMHost.name
+     # $row.Cluster = $vm.VMHost.Parent.Name
+      #$DataLocation = ($Datastores | where {$_.ID -match (($vm.Datastore | Select -First 1) | Select Value).Value} | Select Name).Name
+     # $row.NumCPU = $vm.NumCPU
+     # $row.MemMb = $vm.MemoryMB
+             $DiskGb = ((($vmitem.HardDisks | Measure-Object -Property CapacityKB -Sum).Sum * 1KB / 1GB),2)
+             
+         
+         
+             $output = New-Object -TypeName PSObject;    
+             $output | Add-Member -MemberType NoteProperty -Name "vCenter" -Value $vCenter;
+             $output | Add-Member -MemberType NoteProperty -Name "VM Name" -Value $vmItem.Name
+             $output | Add-Member -MemberType NoteProperty -Name "Guest OS" -Value $vmItem.Guest.OSFullName;
+             $output | Add-Member -MemberType NoteProperty -Name "Power state" -Value $vmItem.Powerstate
+             $output | Add-Member -MemberType NoteProperty -Name "Host" -Value $vmItem.VMHost.name;
+             $output | Add-Member -MemberType NoteProperty -Name "Cluster" -Value $vmItem.VMHost.Parent.Name
+             $output | Add-Member -MemberType NoteProperty -Name "Datastore" -Value $DataLocation
+             $output | Add-Member -MemberType NoteProperty -Name "Size" -Value $DiskGb
+             $output | Add-Member -MemberType NoteProperty -Name "Powered off since" $offDate.CreatedTime
+
+
+
+
+
+            $results += $output
+
+            }
+            
+            
+            $list = @()
+            Disconnect-VIServer $vc.vcName -Force -confirm:$false
+            
+    }
+
+$results | Export-Csv $file -NoTypeInformation   
+$end = date
+Write-Host ("start time "+$start + " End time: " + $end)
