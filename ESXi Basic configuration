@@ -1,0 +1,54 @@
+#################################
+#
+#		Configuracion de NTP, DNS, SPLUNK
+#		Cesar Sandoval
+#		caz.sandoval@gmail.com
+#		08/10/2020   V 1.0
+#
+#################################
+
+
+clear
+
+
+#Change this to match your input file path
+$path = "C:\Scripts\Entradas\esxiConfig.csv"
+[Array]$hostList = @( Import-Csv -Path $path ) 
+
+
+    foreach ($esxHost in $hostList )
+         {
+
+
+        $esxi = Get-VMhost -Name $esxHost.esxName
+
+        #Configure DNS, Change appropertly
+        
+        Get-VMHostNetwork -VMHost $esxi | Set-VMHostNetwork -DNSAddress $esxHost.dns1, $esxHost.dns2 -Confirm:$false 
+
+        ##Configure NTP and start service
+
+        $esxi | Add-VMHostNtpServer -NtpServer $esxHost.ntp1
+        $esxi | Add-VMHostNtpServer -NtpServer $esxHost.ntp2
+        $esxi | Get-VMHostService | Where-Object {$_.key -eq "ntpd" } | Start-VMHostService  
+        $esxi | Get-VMHostService | Where-Object {$_.key -eq "ntpd" } | Set-VMHostService -policy "automatic" 
+        
+            
+         ### Add  syslog Firewall port for syslog
+
+        $esxi | Get-AdvancedSetting "Syslog.global.logHost" | Set-AdvancedSetting -Value "[Syslog Path]"           
+        $esxi | Get-VMHostFirewallException -Name "Syslog" | Set-VMHostFirewallException -Enabled $True 
+
+         ### Disable TLS 1.1, TLS 1.0
+
+        $esxi | Get-AdvancedSetting UserVars.ESXiVPsDisabledProtocols | Set-AdvancedSetting -Value "sslv3,tlsv1,tlsv1.1" -Confirm:$false  
+
+  
+
+}
+
+
+
+$end=date
+Write-Host ("start time "+$start + " End time: " + $end)
+#Disconnect-VIServer * -Force -confirm:$false
