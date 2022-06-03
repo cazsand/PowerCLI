@@ -36,7 +36,7 @@ $path = "C:\Scripts\Entradas\esxiConfig.csv"
             
          ### Add  syslog Firewall port for syslog
 
-        $esxi | Get-AdvancedSetting "Syslog.global.logHost" | Set-AdvancedSetting -Value "[Syslog Path]"           
+        $esxi | Get-AdvancedSetting "Syslog.global.logHost" | Set-AdvancedSetting -Value $esxHost.syslog         
         $esxi | Get-VMHostFirewallException -Name "Syslog" | Set-VMHostFirewallException -Enabled $True 
 
          ### Disable TLS 1.1, TLS 1.0
