@@ -1,0 +1,25 @@
+
+#################################
+#
+#		Set DVS Portgroups
+#		Cesar Sandoval
+#		caz.sandoval@gmail.com
+#		06/17/2020   V 1
+#
+#################################
+
+clear
+$start = date
+
+
+$file = dvsVlanst.csv
+
+[Array]$dvsList = @(Import-Csv -Path "D:\Scripts\Reports\Input\dvs List.csv")
+
+
+ForEach ($vlan in $dvsList) {
+    Get-Cluster -Name $vlan.cluster  | Get-VDSwitch -Name $vlan.vdswitch |
+    New-VDPortgroup -Name $vlan.pgName  |
+    Set-VDPortgroup -VlanId $vlan.VLANid -Confirm:$false
+
+}
