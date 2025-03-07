@@ -1,0 +1,51 @@
+# PowerCLI Script to Check Uplink Status for All Hosts in a Cluster and Reset False Positive Alerts
+
+# Define your vCenter and Cluster
+$VCServer = "vcenter-server"
+$ClusterName = "cluster-name"
+
+Connect-VIServer -Server $VCServer
+
+# Get all hosts in the cluster
+$vmHosts = Get-Cluster -Name $ClusterName | Get-VMHost
+
+# Get the physical network adapters in all hosts
+foreach ($vmHost in $vmHosts) {
+    Write-Host "Checking host: $($vmHost.Name)"  
+    $networkAdapters = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical
+
+    foreach ($adapter in $networkAdapters) {
+        $uplinkName = $adapter.Name
+        $linkStatus = $adapter.BitStatus # Check link status
+
+        if ($linkStatus -eq "Down") {
+            Write-Host "Detected possible issue on $uplinkName of $($vmHost.Name), verifying..."
+
+            # Wait for a few seconds and recheck the status to confirm if it's flapping
+            Start-Sleep -Seconds 10
+            $adapterRefresh = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical | Where-Object {$_.Name -eq $uplinkName}
+
+            if ($adapterRefresh.BitStatus -eq "Up") {
+                Write-Host "False Positive detected for $uplinkName on $($vmHost.Name). Resetting alert."
+
+                # Find the associated vCenter alarm
+                $alarm = Get-AlarmDefinition -Entity $vmHost | Where-Object { $_.Name -like "*Network uplink disconnected*" }
+                if ($alarm) {
+                    Get-AlarmAction -AlarmDefinition $alarm | Remove-AlarmAction -Confirm:$false
+                    Write-Host "Alarm reset for $uplinkName on $($vmHost.Name)."
+                } else {
+                    Write-Host "No specific alarm found for $uplinkName on $($vmHost.Name)."
+                }
+            } else {
+                Write-Host "$uplinkName on $($vmHost.Name) is still down. No false positive detected."
+            }
+        } else {
+            Write-Host "$uplinkName on $($vmHost.Name) is up and running normally."
+        }
+    }
+}
+
+# Disconnect from vCenter
+Disconnect-VIServer -Confirm:$false
+
+Write-Host "Uplink status check completed for all hosts in cluster: $ClusterName."
