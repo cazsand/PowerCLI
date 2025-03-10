@@ -1,46 +1,56 @@
-# PowerCLI Script to Check Uplink Status for All Hosts in a Cluster and Reset False Positive Alerts
+# PowerCLI Script to Check Uplink Status for All Hosts in All Clusters in vCenter
 
-# Define your vCenter and Cluster
-$VCServer = "vcenter-server"
-$ClusterName = "cluster-name"
+# Define your vCenter Server
+$VCServer = "your-vcenter-server"
 
+# Connect to vCenter
 Connect-VIServer -Server $VCServer
 
-# Get all hosts in the cluster
-$vmHosts = Get-Cluster -Name $ClusterName | Get-VMHost
+# Get all clusters in vCenter
+$clusters = Get-Cluster
 
-# Get the physical network adapters in all hosts
-foreach ($vmHost in $vmHosts) {
-    Write-Host "Checking host: $($vmHost.Name)"  
-    $networkAdapters = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical
+# Loop through each cluster
+foreach ($cluster in $clusters) {
+    Write-Host "Checking Cluster: $($cluster.Name)"
 
-    foreach ($adapter in $networkAdapters) {
-        $uplinkName = $adapter.Name
-        $linkStatus = $adapter.BitStatus # Check link status
+    # Get all hosts in the current cluster
+    $vmHosts = Get-VMHost -Location $cluster
 
-        if ($linkStatus -eq "Down") {
-            Write-Host "Detected possible issue on $uplinkName of $($vmHost.Name), verifying..."
+    # Loop through each ESXi host in the cluster
+    foreach ($vmHost in $vmHosts) {
+        Write-Host "Checking host: $($vmHost.Name)"
 
-            # Wait for a few seconds and recheck the status to confirm if it's flapping
-            Start-Sleep -Seconds 10
-            $adapterRefresh = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical | Where-Object {$_.Name -eq $uplinkName}
+        # Get the physical network adapters
+        $networkAdapters = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical
 
-            if ($adapterRefresh.BitStatus -eq "Up") {
-                Write-Host "False Positive detected for $uplinkName on $($vmHost.Name). Resetting alert."
+        foreach ($adapter in $networkAdapters) {
+            $uplinkName = $adapter.Name
+            $linkStatus = $adapter.BitStatus # Check link status
 
-                # Find the associated vCenter alarm
-                $alarm = Get-AlarmDefinition -Entity $vmHost | Where-Object { $_.Name -like "*Network uplink disconnected*" }
-                if ($alarm) {
-                    Get-AlarmAction -AlarmDefinition $alarm | Remove-AlarmAction -Confirm:$false
-                    Write-Host "Alarm reset for $uplinkName on $($vmHost.Name)."
+            if ($linkStatus -eq "Down") {
+                Write-Host "Detected possible issue on $uplinkName of $($vmHost.Name), verifying..."
+
+                # Wait for a few seconds and recheck the status to confirm if it's flapping
+                Start-Sleep -Seconds 10
+                $adapterRefresh = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical | Where-Object {$_.Name -eq $uplinkName}
+
+                if ($adapterRefresh.BitStatus -eq "Up") {
+                    Write-Host "False Positive detected for $uplinkName on $($vmHost.Name). Resetting alert."
+
+                    # Find the associated vCenter alarm
+                    $alarm = Get-AlarmDefinition -Entity $vmHost | Where-Object { $_.Name -like "*Network uplink disconnected*" }
+                    if ($alarm) {
+                        Get-AlarmAction -AlarmDefinition $alarm | Remove-AlarmAction -Confirm:$false
+                        Write-Host "Alarm reset for $uplinkName on $($vmHost.Name)."
+                    } else {
+                        Write-Host "No specific alarm found for $uplinkName on $($vmHost.Name)."
+                    }
                 } else {
-                    Write-Host "No specific alarm found for $uplinkName on $($vmHost.Name)."
+                    Write-Host "$uplinkName on $($vmHost.Name) is still down. No false positive detected."
                 }
             } else {
-                Write-Host "$uplinkName on $($vmHost.Name) is still down. No false positive detected."
+                Write-Host "$uplinkName on $($vmHost.Name) is up and running normally."
             }
-        } else {
-            Write-Host "$uplinkName on $($vmHost.Name) is up and running normally."
         }
     }
 }
@@ -48,4 +58,4 @@ foreach ($vmHost in $vmHosts) {
 # Disconnect from vCenter
 Disconnect-VIServer -Confirm:$false
 
-Write-Host "Uplink status check completed for all hosts in cluster: $ClusterName."
+Write-Host "Uplink status check completed for all hosts in all clusters."
