@@ -1,4 +1,11 @@
-# PowerCLI Script para verificar el estado de los uplinks y resetear a Green
+#################################
+#
+#		PowerCLI Script para verificar el estado de los uplinks y resetear a Green
+#		Cesar Sandoval
+#		caz.sandoval@gmail.com
+#		06/17/2020   V 1.6
+#
+#################################
 
 # Definir al y conectar vCenter Server
 $VCServer = "vcenter-server"
