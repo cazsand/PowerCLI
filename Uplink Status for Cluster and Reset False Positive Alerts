@@ -1,55 +1,47 @@
-# PowerCLI Script to Check Uplink Status for All Hosts in All Clusters in vCenter
+# PowerCLI Script para verificar el estado de los uplinks y resetear a Green
 
-# Define your vCenter Server
-$VCServer = "your-vcenter-server"
-
-# Connect to vCenter
+# Definir al y conectar vCenter Server
+$VCServer = "vcenter-server"
 Connect-VIServer -Server $VCServer
 
-# Get all clusters in vCenter
+# Obtener todos los clusters en el vCenter
+
 $clusters = Get-Cluster
-
-# Loop through each cluster
 foreach ($cluster in $clusters) {
-    Write-Host "Checking Cluster: $($cluster.Name)"
-
-    # Get all hosts in the current cluster
+    Write-Host "Revisando Uplinks del cluster: $($cluster.Name)"
     $vmHosts = Get-VMHost -Location $cluster
 
-    # Loop through each ESXi host in the cluster
+# Obteniendo todos los ESXi y obtener Uplink
     foreach ($vmHost in $vmHosts) {
-        Write-Host "Checking host: $($vmHost.Name)"
-
-        # Get the physical network adapters
+        Write-Host "Revisando host: $($vmHost.Name)"
         $networkAdapters = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical
 
         foreach ($adapter in $networkAdapters) {
             $uplinkName = $adapter.Name
-            $linkStatus = $adapter.BitStatus # Check link status
+            $linkStatus = $adapter.BitStatus
 
             if ($linkStatus -eq "Down") {
-                Write-Host "Detected possible issue on $uplinkName of $($vmHost.Name), verifying..."
+                Write-Host "Posible problema en el $uplinkName del $($vmHost.Name), verificando..."
 
-                # Wait for a few seconds and recheck the status to confirm if it's flapping
+                # Espera de 10 segundos para confimar flapping
                 Start-Sleep -Seconds 10
                 $adapterRefresh = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical | Where-Object {$_.Name -eq $uplinkName}
 
                 if ($adapterRefresh.BitStatus -eq "Up") {
-                    Write-Host "False Positive detected for $uplinkName on $($vmHost.Name). Resetting alert."
-
-                    # Find the associated vCenter alarm
+                    Write-Host "Falso positivo en $uplinkName de $($vmHost.Name). Reseteando alerta a verde."
+                    # Resetear alerta
                     $alarm = Get-AlarmDefinition -Entity $vmHost | Where-Object { $_.Name -like "*Network uplink disconnected*" }
                     if ($alarm) {
                         Get-AlarmAction -AlarmDefinition $alarm | Remove-AlarmAction -Confirm:$false
                         Write-Host "Alarm reset for $uplinkName on $($vmHost.Name)."
                     } else {
-                        Write-Host "No specific alarm found for $uplinkName on $($vmHost.Name)."
+                        Write-Host "No se encontro la alerta especificada en $uplinkName de $($vmHost.Name)."
                     }
                 } else {
-                    Write-Host "$uplinkName on $($vmHost.Name) is still down. No false positive detected."
+                    Write-Host "$uplinkName de $($vmHost.Name) esta abajo. Posible problema de conectividad."
                 }
             } else {
-                Write-Host "$uplinkName on $($vmHost.Name) is up and running normally."
+                Write-Host "$uplinkName de $($vmHost.Name) esta arriba y funcionando correctamente."
             }
         }
     }
@@ -58,4 +50,4 @@ foreach ($cluster in $clusters) {
 # Disconnect from vCenter
 Disconnect-VIServer -Confirm:$false
 
-Write-Host "Uplink status check completed for all hosts in all clusters."
+Write-Host "Revision de uplinks completa."
