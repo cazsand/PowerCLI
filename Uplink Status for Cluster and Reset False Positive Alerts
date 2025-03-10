@@ -2,7 +2,9 @@
 
 # Definir al y conectar vCenter Server
 $VCServer = "vcenter-server"
-Connect-VIServer -Server $VCServer
+
+Get-VICredentialStoreITem -Host $VCServer
+Connect-VIServer -Server $VCServer -ErrorAction SilentlyContinue
 
 # Obtener todos los clusters en el vCenter
 
@@ -11,7 +13,7 @@ foreach ($cluster in $clusters) {
     Write-Host "Revisando Uplinks del cluster: $($cluster.Name)"
     $vmHosts = Get-VMHost -Location $cluster
 
-# Obteniendo todos los ESXi y obtener Uplink
+# Obteniendo todos los ESXi y obtener Uplinks
     foreach ($vmHost in $vmHosts) {
         Write-Host "Revisando host: $($vmHost.Name)"
         $networkAdapters = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical
