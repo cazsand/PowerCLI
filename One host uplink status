@@ -1,0 +1,54 @@
+
+
+# Definir vCenter y ESXi afectado, y conectar vCenter Server
+$VCServer = "vcenter-server"
+$ESXiHost = "esxi-host"
+
+Connect-VIServer -Server $VCServer
+
+# Obtener al ESXi Host
+$vmHost = Get-VMHost -Name $ESXiHost
+
+if ($vmHost) {
+    Write-Host "Checking host: $($vmHost.Name)"
+
+    # Get the physical network adapters
+    $networkAdapters = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical
+
+    foreach ($adapter in $networkAdapters) {
+        $uplinkName = $adapter.Name
+        $linkStatus = $adapter.BitStatus # Check link status
+
+        if ($linkStatus -eq "Down") {
+            Write-Host "Posible problema en la $uplinkName de $($vmHost.Name), verificando..."
+
+            # Espera de 10 segundos para confimar flapping
+            Start-Sleep -Seconds 10
+            $adapterRefresh = Get-VMHostNetworkAdapter -VMHost $vmHost -Physical | Where-Object {$_.Name -eq $uplinkName}
+
+            if ($adapterRefresh.BitStatus -eq "Up") {
+                Write-Host "Falso positivo en $uplinkName de $($vmHost.Name). Reseteando alerta a verde."
+
+                # Encontrar la alerta en el vCenter
+                $alarm = Get-AlarmDefinition -Entity $vmHost | Where-Object { $_.Name -like "*Network uplink disconnected*" }
+                if ($alarm) {
+                    Get-AlarmAction -AlarmDefinition $alarm | Remove-AlarmAction -Confirm:$false
+                    Write-Host "Alarma reseteada para el $uplinkName de $($vmHost.Name)."
+                } else {
+                    Write-Host "No se encontro la alerta especificada en $uplinkName de $($vmHost.Name)."
+                }
+            } else {
+                Write-Host "$uplinkName de $($vmHost.Name) esta abajo. Posible problema de conectividad."
+            }
+        } else {
+            Write-Host "$uplinkName de $($vmHost.Name) esta arriba y funcionando correctamente."
+        }
+    }
+} else {
+    Write-Host "El host ESXi especificado '$ESXiHost' no se encontro en el vCenter."
+}
+
+# Disconnect from vCenter
+Disconnect-VIServer -Confirm:$false
+
+Write-Host "Revision de uplinks completa en el host: $ESXiHost"
