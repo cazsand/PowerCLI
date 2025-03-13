@@ -1,4 +1,11 @@
-
+#################################
+#
+#		PowerCLI Script para verificar el estado de los uplinks y resetear a Green en un solo host
+#		Cesar Sandoval
+#		caz.sandoval@gmail.com
+#		03/13/2025   V 1.0
+#
+#################################
 
 # Definir vCenter y ESXi afectado, y conectar vCenter Server
 $VCServer = "vcenter-server"
