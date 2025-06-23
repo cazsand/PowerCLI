@@ -1,0 +1,7 @@
+Get-Cluster "NOMBRE_DEL_CLUSTER" | Get-VMHost | ForEach-Object {
+    $vmhost = $_
+    Get-ScsiLun -VmHost $vmhost -LunType disk | ForEach-Object {
+        $lun = $_
+        Get-ScsiLunPath -ScsiLun $lun -VmHost $vmhost | Where-Object { $_.State -eq "Dead" } | Select-Object @{N="VMHost";E={$vmhost.Name}}, @{N="Datastore";E={($lun | Get-Datastore | Select -ExpandProperty Name)}}, @{N="CanonicalName";E={$lun.CanonicalName}}, Path, PathState
+    }
+} | Export-Csv -Path "Dead_HBA_Paths.csv" -NoTypeInformation -Encoding UTF8
