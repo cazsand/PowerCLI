@@ -1,0 +1,30 @@
+# Params
+$vmName = "VMName"
+$hostA = "esxia"
+$hostB = "esxib"
+$repeatCount = 10
+
+# Connect to vCenter
+Connect-VIServer -Server "vcenter"
+
+for ($i = 1; $i -le $repeatCount; $i++) {
+  Write-Host "[$i/$repeatCount] Moving VM $vmName to host..."
+
+    # Obtain VM and destination ESXi
+    $vm = Get-VM -Name $vmName
+    $currentHost = $vm.VMHost.Name
+
+    if ($currentHost -eq $hostA) {
+        $targetHost = Get-VMHost -Name $hostB
+    } else {
+        $targetHost = Get-VMHost -Name $hostA
+    }
+
+    #  vMotion
+    Move-VM -VM $vm -Destination $targetHost -Confirm:$false
+
+      Write-Host "[$i/$repeatCount] vMotion completed. Waiting 10 secs..."
+    Start-Sleep -Seconds 10
+}
+
+Write-Host "✅ vMotions completed."
