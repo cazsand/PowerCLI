@@ -1,62 +1,56 @@
-# Connect-VIServer -Server 
+$yesterdayDate = (Get-Date).Date.AddDays(-1)               # ayer (domingo si hoy es lunes)
+$finish = $yesterdayDate.AddDays(1).AddSeconds(-1)         # ayer 23:59:59
 
-$csvOut = ".\VC_AllClusters_HA_Events_Fri_to_Sun.csv"
-
-# ---------- CALCULAR RANGO: Viernes 00:00 -> Domingo 23:59:59 (fin de "ayer" si hoy es lunes) ----------
-$yesterdayDate = (Get-Date).Date.AddDays(-1)
-$finish = $yesterdayDate.AddDays(1).AddSeconds(-1)
 $daysSinceFriday = ([int]$yesterdayDate.DayOfWeek - [int][System.DayOfWeek]::Friday)
 if ($daysSinceFriday -lt 0) { $daysSinceFriday += 7 }
-$start = $yesterdayDate.AddDays(-$daysSinceFriday) 
+$start = $yesterdayDate.AddDays(-$daysSinceFriday)         # viernes 00:00:00
 
 Write-Host "Rango de búsqueda: $start  ->  $finish" -ForegroundColor Cyan
 
-$allClusters = Get-Cluster | Sort-Object Name
-$results = New-Object System.Collections.Generic.List[object]
+# ---- PATRONES / TIPOS de HA ----
+$haRegex = "vSphere HA|restarted by vSphere HA|HA restarted|Failover|failover|restart.*HA"
 
-foreach ($cluster in $allClusters) {
+$rows = New-Object System.Collections.Generic.List[object]
 
-    Write-Host "Procesando cluster: $($cluster.Name)" -ForegroundColor Yellow
-    $events = Get-VIEvent -Entity $cluster -Start $start -Finish $finish -MaxSamples 200000 -ErrorAction SilentlyContinue
+foreach ($cluster in (Get-Cluster | Sort-Object Name)) {
+
+    Write-Host "Cluster: $($cluster.Name) - obteniendo VMs..." -ForegroundColor Yellow
+    $vms = Get-Cluster $cluster | Get-VM -ErrorAction SilentlyContinue
+    if (-not $vms) { continue }
+
+    # Eventos por VM (esto suele traer el nombre bien)
+    Write-Host "Cluster: $($cluster.Name) - buscando eventos..." -ForegroundColor Yellow
+    $events = Get-VIEvent -Entity $vms -Start $start -Finish $finish -MaxSamples 200000 -ErrorAction SilentlyContinue
 
     if (-not $events) { continue }
 
-    $haTyped = $events | Where-Object {
-        $_ -is [VMware.Vim.VmRestartedOnAlternateHostEvent]
+    $haEvents = $events | Where-Object {
+        $_ -is [VMware.Vim.VmRestartedOnAlternateHostEvent] -or
+        $_.FullFormattedMessage -match $haRegex
     }
-
-    $haText = $events | Where-Object {
-        $_.FullFormattedMessage -match "vSphere HA|restarted by vSphere HA|HA restarted|HA initiated|Failover|failover"
-    }
-
-    # Unir y deduplicar por (CreatedTime + EventType + VM + Message)
-    $haEvents = @($haTyped + $haText) | Where-Object { $_ } |
-        Sort-Object CreatedTime |
-        Select-Object -Unique CreatedTime, @{N="EventType";E={$_.GetType().Name}}, @{N="VMId";E={ if ($_.Vm) {$_.Vm.Vm} else {""} }}, FullFormattedMessage
 
     foreach ($e in $haEvents) {
-        $vmName = $null
-        if ($e.Vm) { $vmName = $e.Vm.Name }
-
-        $hostName = $null
-        if ($e.Host) { $hostName = $e.Host.Name }
-
-        $results.Add([pscustomobject]@{
-            Cluster   = $cluster.Name
-            Time      = $e.CreatedTime
-            VM        = $vmName
-            Host      = $hostName
-            User      = $e.UserName
-            EventType = $e.GetType().Name
-            Message   = $e.FullFormattedMessage
-        })
+        if ($e.Vm -and $e.Vm.Name) {
+            $rows.Add([pscustomobject]@{
+                Time = $e.CreatedTime
+                VM   = $e.Vm.Name
+            })
+        }
     }
 }
 
-# ---------- SALIDA ----------
-$resultsSorted = $results | Sort-Object Time, Cluster, VM
-$resultsSorted | Format-Table -AutoSize
+# ---- DEDUP: misma VM en el mismo minuto (evita spam de múltiples eventos) ----
+# Puedes quitar el ToString("yyyy-MM-dd HH:mm") si quieres al segundo.
+$result = $rows |
+    Select-Object @{N="Time";E={$_.Time}}, @{N="VM";E={$_.VM}}, @{N="MinuteKey";E={$_.Time.ToString("yyyy-MM-dd HH:mm")}} |
+    Sort-Object Time, VM |
+    Group-Object VM, MinuteKey |
+    ForEach-Object {
+        $_.Group | Select-Object -First 1 | Select-Object Time, VM
+    }
 
-# Export CSV
-$resultsSorted | Export-Csv -Path $csvOut -NoTypeInformation -Encoding UTF8
-Write-Host "CSV generado: $csvOut" -ForegroundColor Green
+# Salida en consola
+$result | Format-Table -AutoSize
+
+# Export opcional
+$result | Export-Csv ".\HA_VMs_Fri_to_Sun_VM_and_Time.csv" -NoTypeInformation -Encoding UTF8
